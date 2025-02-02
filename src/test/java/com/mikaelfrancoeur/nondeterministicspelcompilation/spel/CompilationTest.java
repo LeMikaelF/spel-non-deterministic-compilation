@@ -1,6 +1,7 @@
 package com.mikaelfrancoeur.nondeterministicspelcompilation.spel;
 
 import org.assertj.core.api.WithAssertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
@@ -27,20 +28,32 @@ public class CompilationTest implements WithAssertions {
     }
 
     @Test
+    @Disabled("this demo is easier to understand if the last assertion fails")
     void unCompilableExpression() {
-        Expression expression = new SpelExpressionParser().parseExpression("left && right");
+        // declare and parse an expression
+        Expression expression = new SpelExpressionParser().parseExpression("left and right");
+
+        // set the values of "left" and "right" on the evaluation context
         SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
                 .withRootObject(new ExpressionRoot(false, true))
                 .build();
 
+        // SpelCompiler.compile() tries to compile the expression,
+        // returning true if it succeeded, and false otherwise.
+        // If true, further evaluations of the `SpelExpression` will
+        // run in compiled mode.
+        // TODO check if they will revert to interpreted on exceptions if compiler is off or mixed
         assertThat(SpelCompiler.compile(expression))
                 .isFalse();
 
+        // evaluate the expression
         assertThat(expression.getValue(context))
                 .isEqualTo(false);
 
+        // check that the expression is compilable;
+        // this fails because the right operand has not been evaluated yet
         assertThat(SpelCompiler.compile(expression))
-                .isFalse();
+                .isTrue();
     }
 
     @Test
