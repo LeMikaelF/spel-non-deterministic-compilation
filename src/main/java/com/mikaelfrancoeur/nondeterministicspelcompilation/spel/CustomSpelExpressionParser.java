@@ -9,10 +9,12 @@ import org.springframework.expression.ParseException;
 import org.springframework.expression.ParserContext;
 import org.springframework.expression.TypedValue;
 import org.springframework.expression.spel.ExpressionState;
+import org.springframework.expression.spel.SpelNode;
 import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.ast.OpAnd;
 import org.springframework.expression.spel.ast.OpOr;
 import org.springframework.expression.spel.ast.SpelNodeImpl;
+import org.springframework.expression.spel.ast.Ternary;
 import org.springframework.expression.spel.standard.SpelExpression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.BooleanTypedValue;
@@ -30,24 +32,31 @@ public class CustomSpelExpressionParser extends SpelExpressionParser {
     public Expression parseExpression(String expressionString, @Nullable ParserContext context) throws ParseException {
         SpelExpression expression = (SpelExpression) delegate.parseExpression(expressionString, context);
 
-        return new SpelExpression(expressionString, transformAst((SpelNodeImpl) expression.getAST()), configuration);
+        SpelNode ast = expression.getAST();
+
+        return new SpelExpression(expressionString, transformAst((SpelNodeImpl) ast), configuration);
     }
 
-    @Override
-    public Expression parseExpression(String expressionString) throws ParseException {
-        return parseExpression(expressionString, null);
-    }
+    // ...
 
     public SpelNodeImpl transformAst(SpelNodeImpl root) {
         return switch (root) {
-            case OpAnd opAnd -> new NonShortCircuitingFirstEvaluationAnd(
+            case OpAnd opAnd -> new NonShortCircuitingWhenInterpretedAnd(
                     opAnd.getStartPosition(),
                     opAnd.getEndPosition(),
+                    // recursive case
                     transformChildren(getChildren(opAnd)));
-            case OpOr opOr -> new NonShortCircuitingFirstEvaluationAnd(
+            case OpOr opOr -> new NonShortCircuitingWhenInterpretedOr(
                     opOr.getStartPosition(),
                     opOr.getEndPosition(),
+                    // recursive case
                     transformChildren(getChildren(opOr)));
+            case Ternary ternary -> new NonShortCircuitingWhenInterpretedTernary(
+                    ternary.getStartPosition(),
+                    ternary.getEndPosition(),
+                    // recursive case
+                    transformChildren(getChildren(ternary)));
+            // base case
             default -> root;
         };
     }
@@ -66,33 +75,62 @@ public class CustomSpelExpressionParser extends SpelExpressionParser {
         return children;
     }
 
-    private static class NonShortCircuitingFirstEvaluationAnd extends OpAnd {
+    private static class NonShortCircuitingWhenInterpretedAnd extends OpAnd {
 
-        private volatile boolean initialized;
-
-        public NonShortCircuitingFirstEvaluationAnd(int startPos, int endPos, SpelNodeImpl... operands) {
+        public NonShortCircuitingWhenInterpretedAnd(int startPos, int endPos, SpelNodeImpl... operands) {
             super(startPos, endPos, operands);
         }
 
         @Override
+        //TODO add error reporting from superclass
         public TypedValue getValueInternal(ExpressionState state) throws EvaluationException {
-            if (!initialized) {
-                synchronized (this) {
-                    if (!initialized) {
-                        initialized = true;
+            Boolean left = (Boolean) getLeftOperand().getValue(state);
+            Boolean right = (Boolean) getRightOperand().getValue(state);
 
-                        Boolean left = (Boolean) getLeftOperand().getValue(state);
-                        Boolean right = (Boolean) getRightOperand().getValue(state);
+            Objects.requireNonNull(left);
+            Objects.requireNonNull(right);
 
-                        Objects.requireNonNull(left);
-                        Objects.requireNonNull(right);
+            return BooleanTypedValue.forValue(left && right);
+        }
+    }
 
-                        return BooleanTypedValue.forValue(left && right);
-                    }
-                }
-            }
+    private static class NonShortCircuitingWhenInterpretedOr extends OpOr {
 
-            return super.getValueInternal(state);
+        public NonShortCircuitingWhenInterpretedOr(int startPos, int endPos, SpelNodeImpl... operands) {
+            super(startPos, endPos, operands);
+        }
+
+        @Override
+        //TODO add error reporting from superclass
+        public BooleanTypedValue getValueInternal(ExpressionState state) throws EvaluationException {
+            Boolean left = (Boolean) getLeftOperand().getValue(state);
+            Boolean right = (Boolean) getRightOperand().getValue(state);
+
+            Objects.requireNonNull(left);
+            Objects.requireNonNull(right);
+
+            return BooleanTypedValue.forValue(left || right);
+        }
+    }
+
+    private static class NonShortCircuitingWhenInterpretedTernary extends Ternary {
+
+        public NonShortCircuitingWhenInterpretedTernary(int startPos, int endPos, SpelNodeImpl... args) {
+            super(startPos, endPos, args);
+        }
+
+        @Override
+        //TODO add error reporting from superclass
+        public TypedValue getValueInternal(ExpressionState state) throws EvaluationException {
+            Boolean one = (Boolean) getChild(0).getValue(state);
+            Boolean two = (Boolean) getChild(1).getValue(state);
+            Boolean three = (Boolean) getChild(2).getValue(state);
+
+            Objects.requireNonNull(one);
+            Objects.requireNonNull(two);
+            Objects.requireNonNull(three);
+
+            return BooleanTypedValue.forValue(one ? two : three);
         }
     }
 }

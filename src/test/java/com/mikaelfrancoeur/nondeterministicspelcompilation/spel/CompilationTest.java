@@ -57,7 +57,7 @@ public class CompilationTest implements WithAssertions {
     }
 
     @Test
-    void unCompilableExpressionWithCustomParser() {
+    void unCompilableAndExpressionWithCustomParser() {
         Expression expression = new CustomSpelExpressionParser().parseExpression("left && right");
         SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
                 .withRootObject(new ExpressionRoot(false, true))
@@ -73,10 +73,46 @@ public class CompilationTest implements WithAssertions {
                 .isTrue();
     }
 
+    @Test
+    void uncompilableOrExpressionWithCustomParser() {
+        Expression expression = new CustomSpelExpressionParser().parseExpression("left or right");
+        SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
+                .withRootObject(new ExpressionRoot(true, false))
+                .build();
+
+        assertThat(SpelCompiler.compile(expression))
+                .isFalse();
+
+        assertThat(expression.getValue(context))
+                .isEqualTo(true);
+
+        assertThat(SpelCompiler.compile(expression))
+                .isTrue();
+    }
+
+    @Test
+    void uncompilableTernaryExpressionWithCustomParser() {
+        Expression expression = new CustomSpelExpressionParser().parseExpression("left ? right : #third");
+        SimpleEvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding()
+                .withRootObject(new ExpressionRoot(true, true))
+                .build();
+        context.setVariable("third", false);
+
+        assertThat(SpelCompiler.compile(expression))
+                .isFalse();
+
+        assertThat(expression.getValue(context))
+                .isEqualTo(true);
+
+        assertThat(SpelCompiler.compile(expression))
+                .isTrue();
+    }
+
     public record ExpressionRoot(Boolean left, Boolean right) {
     }
 
     @Test
+    @Disabled("the purpose of this test is to demonstrate that the compilability of the expression is not deterministic")
     void nonDeterminisicCompilability() {
         Expression expression = new SpelExpressionParser()
                 .parseExpression("T(java.util.concurrent.ThreadLocalRandom).current().nextBoolean() && right");
