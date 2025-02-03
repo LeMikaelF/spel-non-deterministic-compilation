@@ -9,6 +9,7 @@ import org.springframework.expression.ParseException;
 import org.springframework.expression.ParserContext;
 import org.springframework.expression.TypedValue;
 import org.springframework.expression.spel.ExpressionState;
+import org.springframework.expression.spel.SpelCompilerMode;
 import org.springframework.expression.spel.SpelNode;
 import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.ast.OpAnd;
@@ -25,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CustomSpelExpressionParser extends SpelExpressionParser {
 
-    private final SpelParserConfiguration configuration = new SpelParserConfiguration();
+    private final SpelParserConfiguration configuration = new SpelParserConfiguration(SpelCompilerMode.IMMEDIATE, null);
     private final SpelExpressionParser delegate = new SpelExpressionParser(configuration);
 
     @Override
