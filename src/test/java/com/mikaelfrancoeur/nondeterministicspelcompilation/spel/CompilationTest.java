@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
+import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.standard.SpelCompiler;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
@@ -42,7 +43,6 @@ public class CompilationTest implements WithAssertions {
         // returning true if it succeeded, and false otherwise.
         // If true, further evaluations of the `SpelExpression` will
         // run in compiled mode.
-        // TODO check if they will revert to interpreted on exceptions if compiler is off or mixed
         assertThat(SpelCompiler.compile(expression))
                 .isFalse();
 
